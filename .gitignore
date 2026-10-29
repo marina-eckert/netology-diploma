@@ -1,0 +1,9 @@
+node_modules/
+dist/
+dist-server/
+.env
+uploads/
+design/canvas.fig
+design/images/
+design/decoded.json
+*.log
