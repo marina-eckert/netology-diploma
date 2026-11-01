@@ -49,3 +49,9 @@ RETURNS INTEGER LANGUAGE SQL STABLE AS $$
   ) running
  ),0))::int FROM books b WHERE b.id=p_book
 $$;
+
+CREATE TABLE IF NOT EXISTS uploaded_covers (
+  filename TEXT PRIMARY KEY,
+  mime_type TEXT NOT NULL CHECK (mime_type IN ('image/jpeg', 'image/png', 'image/webp')),
+  data BYTEA NOT NULL CHECK (octet_length(data) <= 5242880)
+);

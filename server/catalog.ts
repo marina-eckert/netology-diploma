@@ -8,6 +8,7 @@ import {
   Query,
   Body,
   Req,
+  Res,
   Injectable,
   Module,
   NotFoundException,
@@ -17,7 +18,8 @@ import {
   UploadedFile,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { diskStorage } from "multer";
+import { diskStorage, memoryStorage } from "multer";
+import type { Response } from "express";
 import { randomUUID } from "node:crypto";
 import { Database } from "./database.js";
 import { allow, UsersModule, UsersService } from "./auth.js";
@@ -79,7 +81,7 @@ export class CatalogService {
     if (!rows[0]) throw new NotFoundException();
     return rows[0];
   }
-  async save(data: any, bookId?: number, cover?: string) {
+  async save(data: any, bookId?: number, file?: Express.Multer.File) {
     return this.db.transaction(async (em) => {
       const previous = bookId
         ? (
@@ -125,6 +127,23 @@ export class CatalogService {
           : data.year
             ? count(data.year, 0, 2100)
             : null;
+      let cover: string | undefined;
+      if (file) {
+        const filename =
+          file.filename ||
+          randomUUID() +
+            ({
+              "image/jpeg": ".jpg",
+              "image/png": ".png",
+              "image/webp": ".webp",
+            }[file.mimetype] || "");
+        cover = `/uploads/${filename}`;
+        if (process.env.UPLOAD_STORAGE === "database")
+          await em.query(
+            "INSERT INTO uploaded_covers(filename, mime_type, data) VALUES ($1,$2,$3)",
+            [filename, file.mimetype, file.buffer],
+          );
+      }
       const values = [
         libraryId,
         text(data.title ?? previous?.title, "Название", 1, 300),
@@ -176,21 +195,24 @@ export class CatalogService {
 }
 const upload = () =>
   FileInterceptor("coverImage", {
-    storage: diskStorage({
-      destination: "uploads",
-      filename: (_r, f, cb) =>
-        cb(
-          null,
-          randomUUID() +
-            ((
-              {
-                "image/jpeg": ".jpg",
-                "image/png": ".png",
-                "image/webp": ".webp",
-              } as Record<string, string>
-            )[f.mimetype] || ""),
-        ),
-    }),
+    storage:
+      process.env.UPLOAD_STORAGE === "database"
+        ? memoryStorage()
+        : diskStorage({
+            destination: "uploads",
+            filename: (_r, f, cb) =>
+              cb(
+                null,
+                randomUUID() +
+                  ((
+                    {
+                      "image/jpeg": ".jpg",
+                      "image/png": ".png",
+                      "image/webp": ".webp",
+                    } as Record<string, string>
+                  )[f.mimetype] || ""),
+              ),
+          }),
     limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (_r, f, cb) => {
       if (!["image/jpeg", "image/png", "image/webp"].includes(f.mimetype))
@@ -245,11 +267,7 @@ export class AdminController {
     @UploadedFile() file: any,
   ) {
     allow(req, "admin");
-    return this.service.save(
-      b,
-      undefined,
-      file ? `/uploads/${file.filename}` : undefined,
-    );
+    return this.service.save(b, undefined, file);
   }
   @Patch("books/:id") @UseInterceptors(upload()) edit(
     @Req() req: any,
@@ -258,11 +276,7 @@ export class AdminController {
     @UploadedFile() file: any,
   ) {
     allow(req, "admin");
-    return this.service.save(
-      b,
-      id(v),
-      file ? `/uploads/${file.filename}` : undefined,
-    );
+    return this.service.save(b, id(v), file);
   }
   @Delete("books/:id") remove(@Req() req: any, @Param("id") v: string) {
     allow(req, "admin");
@@ -297,9 +311,33 @@ export class ManagerUsersController {
     return (await this.users.findAll(q)).map(publicUser);
   }
 }
+@Controller("uploads")
+export class UploadsController {
+  constructor(private db: Database) {}
+  @Get(":filename") async image(
+    @Param("filename") filename: string,
+    @Res() res: Response,
+  ) {
+    if (process.env.UPLOAD_STORAGE !== "database")
+      throw new NotFoundException();
+    const [cover] = await this.db.query(
+      "SELECT mime_type, data FROM uploaded_covers WHERE filename=$1",
+      [filename],
+    );
+    if (!cover) throw new NotFoundException();
+    res.setHeader("Content-Type", cover.mime_type);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(cover.data);
+  }
+}
 @Module({
   imports: [UsersModule],
-  controllers: [CatalogController, AdminController, ManagerUsersController],
+  controllers: [
+    CatalogController,
+    AdminController,
+    ManagerUsersController,
+    UploadsController,
+  ],
   providers: [CatalogService],
   exports: [CatalogService],
 })

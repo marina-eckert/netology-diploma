@@ -27,6 +27,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-library}
       SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env}
       SEED_DEMO: ${SEED_DEMO:-true}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-Library123!}
+      UPLOAD_STORAGE: ${UPLOAD_STORAGE:-disk}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
     volumes:
       - uploads:/app/uploads

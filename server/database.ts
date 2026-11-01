@@ -7,11 +7,15 @@ export class Database extends DataSource implements OnModuleInit {
   constructor() {
     super({
       type: "postgres",
-      host: process.env.POSTGRES_HOST || "127.0.0.1",
-      port: Number(process.env.POSTGRES_PORT || 5438),
-      username: process.env.POSTGRES_USER || "library",
-      password: process.env.POSTGRES_PASSWORD || "library_local",
-      database: process.env.POSTGRES_DB || "library",
+      ...(process.env.DATABASE_URL
+        ? { url: process.env.DATABASE_URL }
+        : {
+            host: process.env.POSTGRES_HOST || "127.0.0.1",
+            port: Number(process.env.POSTGRES_PORT || 5438),
+            username: process.env.POSTGRES_USER || "library",
+            password: process.env.POSTGRES_PASSWORD || "library_local",
+            database: process.env.POSTGRES_DB || "library",
+          }),
       synchronize: false,
     });
   }
@@ -21,7 +25,14 @@ export class Database extends DataSource implements OnModuleInit {
     if (process.env.SEED_DEMO === "true") await this.seed();
   }
   async seed() {
-    const password = await hash("Library123!", 12);
+    const demoPassword =
+      process.env.DEMO_PASSWORD ||
+      (process.env.NODE_ENV !== "production" ? "Library123!" : "");
+    if (demoPassword.length < 8 || Buffer.byteLength(demoPassword) > 72)
+      throw new Error(
+        "Set DEMO_PASSWORD (8–72 bytes) before enabling SEED_DEMO",
+      );
+    const password = await hash(demoPassword, 12);
     for (const [email, name, role] of [
       ["admin@library.local", "Анна Администратор", "admin"],
       ["manager@library.local", "Мария Консультант", "manager"],

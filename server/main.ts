@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import "dotenv/config";
 import { NestFactory } from "@nestjs/core";
-import { Module } from "@nestjs/common";
+import { Controller, Get, Module } from "@nestjs/common";
 import { NestExpressApplication } from "@nestjs/platform-express";
 import session from "express-session";
 import passport from "passport";
@@ -18,7 +18,14 @@ import {
 import { LibrariesModule } from "./catalog.js";
 import { RentalsModule } from "./rentals.js";
 import { SupportModule } from "./support.js";
+@Controller("api/health")
+class HealthController {
+  @Get() check() {
+    return { status: "ok" };
+  }
+}
 @Module({
+  controllers: [HealthController],
   imports: [
     DatabaseModule,
     UsersModule,
@@ -107,6 +114,7 @@ async function bootstrap() {
     if (
       req.method === "GET" &&
       !req.path.startsWith("/api/") &&
+      !req.path.startsWith("/uploads/") &&
       !req.path.startsWith("/socket.io/")
     )
       return res.sendFile(resolve("dist/index.html"));
@@ -126,8 +134,9 @@ async function bootstrap() {
   gateway.server.engine.use(passport.initialize());
   gateway.server.engine.use(passport.session());
   await app.listen(
-    Number(process.env.HTTP_PORT || 3000),
-    process.env.HTTP_HOST || "127.0.0.1",
+    Number(process.env.HTTP_PORT || process.env.PORT || 3000),
+    process.env.HTTP_HOST ||
+      (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1"),
   );
 }
 bootstrap().catch((e) => {
