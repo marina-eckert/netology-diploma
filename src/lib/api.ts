@@ -1,4 +1,4 @@
-export async function api<T = any>(
+export async function api<T = unknown>(
   url: string,
   options: RequestInit = {},
 ): Promise<T> {
@@ -19,34 +19,7 @@ export async function api<T = any>(
     );
   return data;
 }
-export const send = (method: string, body: any): RequestInit => ({
+export const send = (method: string, body: unknown): RequestInit => ({
   method,
   body: JSON.stringify(body),
 });
-export type User = {
-  id: number;
-  name: string;
-  email: string;
-  contactPhone: string;
-  role: "client" | "admin" | "manager";
-};
-export type Library = {
-  id: number;
-  name: string;
-  address: string;
-  description: string;
-};
-export type Book = {
-  id: number;
-  libraryId: number;
-  title: string;
-  author: string;
-  description: string;
-  year: number;
-  coverImage: string;
-  libraryName: string;
-  address: string;
-  totalCopies: number;
-  availableCopies: number;
-  isAvailable: boolean;
-};

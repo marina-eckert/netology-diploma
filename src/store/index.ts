@@ -1,5 +1,5 @@
 import { configureStore, createSlice, PayloadAction } from "@reduxjs/toolkit";
-import type { User } from "./api";
+import type { User } from "../types";
 const session = createSlice({
   name: "session",
   initialState: { user: null as User | null, ready: false },

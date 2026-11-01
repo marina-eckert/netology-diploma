@@ -1,0 +1,504 @@
+@media (min-width: 1500px) {
+  .hero-heading h1 {
+    font-size: 57px;
+  }
+  .hero {
+    padding-top: 65px;
+  }
+  .hero-art {
+    margin-top: -180px;
+    min-height: 530px;
+  }
+  .hero-body {
+    margin-top: 32px;
+  }
+  .search-form {
+    gap: 23px;
+    padding: 32px;
+  }
+  .book-card {
+    flex-direction: row;
+    gap: 24px;
+    padding: 28px 22px;
+  }
+  .cover-link {
+    height: 190px;
+    width: 110px;
+    flex-shrink: 0;
+    background: none;
+    margin-bottom: 0;
+  }
+  .cover-link img {
+    height: auto;
+    width: 110px;
+    max-width: 100%;
+    max-height: 190px;
+  }
+  .book-card h3 {
+    font-size: 16px;
+  }
+  .book-description {
+    -webkit-line-clamp: 4;
+  }
+  .card-info {
+    min-width: 0;
+  }
+  .book-grid {
+    gap: 24px;
+  }
+  .card-library {
+    font-size: 8px;
+  }
+  .art-circle {
+    left: 90px;
+  }
+  .art-book.book-a {
+    left: 100px;
+  }
+  .art-book.book-b {
+    left: 265px;
+  }
+  .art-stack {
+    left: 120px;
+  }
+  .art-star {
+    left: 435px;
+  }
+  .art-spark {
+    left: 35px;
+  }
+  .s2 {
+    left: 105px;
+  }
+}
+@media (max-width: 1050px) {
+  .container {
+    width: calc(100% - 48px);
+  }
+  .hero-body {
+    gap: 25px;
+  }
+  .hero-heading h1 {
+    font-size: 43px;
+  }
+  .hero-art {
+    transform: scale(0.8);
+    transform-origin: center center;
+    margin-inline: -40px;
+  }
+  .book-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .header-row {
+    gap: 20px;
+  }
+  nav {
+    gap: 20px;
+  }
+  .account-layout {
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: 25px;
+  }
+  .support-layout {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+  .book-detail {
+    grid-template-columns: 270px 1fr;
+    gap: 35px;
+  }
+  .detail-cover {
+    padding: 30px;
+    min-height: 350px;
+  }
+  .book-detail h1 {
+    font-size: 31px;
+  }
+  .booking {
+    gap: 30px;
+  }
+  .steps {
+    gap: 30px;
+  }
+  .library-grid {
+    grid-template-columns: 1fr;
+  }
+  .library-card {
+    padding: 25px;
+  }
+  .library-card h2 {
+    max-width: 80%;
+  }
+  .library-card > svg {
+    margin-bottom: 15px;
+  }
+  .footer-row {
+    grid-template-columns: 1fr 2fr;
+  }
+  .footer-row > div:last-child {
+    display: none;
+  }
+}
+@media (max-width: 700px) {
+  .container {
+    width: calc(100% - 32px);
+  }
+  .header-row {
+    min-height: 86px;
+    flex-wrap: wrap;
+    gap: 15px;
+    padding-block: 18px;
+  }
+  .logo {
+    font-size: 20px;
+  }
+  .logo > svg {
+    width: 27px;
+  }
+  nav {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    gap: 32px;
+    font-size: 12px;
+  }
+  .header-actions {
+    gap: 12px;
+  }
+  .header-actions .btn {
+    padding: 9px 14px;
+    min-height: 37px;
+    font-size: 12px;
+  }
+  .header-actions .text-button,
+  .account-link {
+    font-size: 11px;
+  }
+  .hero {
+    padding-top: 35px;
+  }
+  .hero-heading h1 {
+    font-size: 36px;
+    letter-spacing: -1.3px;
+  }
+  .hero-heading p {
+    font-size: 12px;
+  }
+  .eyebrow {
+    font-size: 9px;
+    letter-spacing: 1.6px;
+  }
+  .hero-body {
+    grid-template-columns: 1fr;
+    margin-top: 25px;
+  }
+  .hero-art {
+    display: none;
+  }
+  .search-form {
+    padding: 23px;
+    gap: 17px;
+  }
+  .search-form .btn {
+    width: 100%;
+  }
+  .section {
+    padding-block: 35px;
+  }
+  .section-head {
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 22px;
+  }
+  .section-head h2,
+  h2 {
+    font-size: 23px;
+  }
+  .section-head .more {
+    font-size: 10px;
+    gap: 5px;
+  }
+  .section-head .more svg {
+    width: 15px;
+  }
+  .book-grid {
+    gap: 14px;
+  }
+  .book-card {
+    padding: 14px 12px;
+  }
+  .cover-link {
+    height: 155px;
+    margin-bottom: 14px;
+  }
+  .cover-link img {
+    height: 130px;
+  }
+  .book-card h3 {
+    font-size: 12px;
+    min-height: 50px;
+  }
+  .availability {
+    font-size: 7px;
+    line-height: 1.5;
+  }
+  .author {
+    font-size: 9px;
+    min-height: 44px;
+  }
+  .book-description {
+    font-size: 9px;
+    -webkit-line-clamp: 3;
+  }
+  .card-library {
+    font-size: 8px;
+    min-height: 40px;
+  }
+  .card-button {
+    font-size: 10px;
+    gap: 5px;
+  }
+  .steps {
+    grid-template-columns: 1fr;
+    gap: 27px;
+  }
+  .steps > div {
+    padding-left: 65px;
+    position: relative;
+  }
+  .steps > div > span {
+    position: absolute;
+    left: 0;
+    top: 10px;
+  }
+  .steps h3 {
+    font-size: 16px;
+    margin-top: 8px;
+  }
+  .steps p {
+    max-width: 100%;
+  }
+  .how-section {
+    padding: 35px 0;
+  }
+  .map-preview {
+    height: 250px;
+  }
+  .map-preview > span {
+    left: 14px;
+    bottom: 14px;
+    font-size: 11px;
+    padding: 12px;
+  }
+  .footer-row {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding-bottom: 20px;
+  }
+  .footer-row strong {
+    font-size: 13px;
+  }
+  .footer-row p {
+    font-size: 10px;
+  }
+  .footer-bottom {
+    font-size: 8px;
+    padding-bottom: 25px;
+  }
+  .footer-bottom span {
+    display: none;
+  }
+  footer {
+    padding-top: 30px;
+    margin-top: 25px;
+  }
+  .page {
+    padding-top: 25px;
+  }
+  .page h1 {
+    font-size: 29px;
+    letter-spacing: -0.8px;
+  }
+  .breadcrumb {
+    font-size: 10px;
+    margin-bottom: 25px;
+  }
+  .search-form.compact {
+    grid-template-columns: 1fr;
+    padding: 20px;
+    gap: 15px;
+  }
+  .search-form.compact .btn {
+    width: 100%;
+  }
+  .catalog-toolbar {
+    display: block;
+  }
+  .catalog-toolbar h2 {
+    margin-bottom: 20px;
+  }
+  .filters {
+    gap: 12px;
+    justify-content: space-between;
+  }
+  .filters select {
+    max-width: 52%;
+    font-size: 10px;
+  }
+  .checkbox {
+    font-size: 10px;
+  }
+  .book-detail {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    margin-top: 0;
+  }
+  .detail-cover {
+    max-height: 340px;
+    min-height: 300px;
+  }
+  .detail-cover img {
+    max-height: 250px;
+  }
+  .book-detail h1 {
+    font-size: 30px;
+  }
+  .detail-author {
+    font-size: 16px;
+  }
+  .description {
+    font-size: 13px;
+  }
+  .booking {
+    grid-template-columns: 1fr;
+    padding: 25px;
+    gap: 15px;
+  }
+  .booking h2 {
+    font-size: 24px;
+  }
+  .date-row {
+    gap: 12px;
+  }
+  .field input,
+  .field select {
+    padding: 12px;
+    font-size: 12px;
+  }
+  .library-grid {
+    margin-block: 25px;
+  }
+  .about h1 {
+    font-size: 39px;
+  }
+  .about-panel {
+    padding: 28px;
+  }
+  .lead {
+    font-size: 15px;
+  }
+  .overlay {
+    padding: 15px;
+  }
+  .modal {
+    padding: 30px 23px;
+  }
+  .modal h2 {
+    font-size: 22px;
+  }
+  .account-layout {
+    grid-template-columns: 1fr;
+    gap: 27px;
+  }
+  .account-layout aside {
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 0 0 12px;
+    gap: 8px;
+  }
+  .account-layout aside a {
+    white-space: nowrap;
+    padding: 12px;
+    font-size: 10px;
+  }
+  .account-title {
+    margin-bottom: 23px;
+  }
+  .account-title .avatar {
+    width: 46px;
+    height: 46px;
+    font-size: 18px;
+  }
+  .account-content h2 {
+    font-size: 22px;
+  }
+  .profile-card {
+    padding: 20px;
+    gap: 18px;
+  }
+  .profile-card h3 {
+    font-size: 15px;
+  }
+  .rental-card {
+    padding: 16px;
+    gap: 17px;
+  }
+  .rental-card img {
+    width: 60px;
+    height: 90px;
+  }
+  .support-layout {
+    grid-template-columns: 1fr;
+    min-height: 500px;
+  }
+  .chat-list {
+    max-height: 145px;
+    display: flex;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .chat-list button {
+    min-width: 150px;
+    border-bottom: 0;
+    border-right: 1px solid var(--line);
+  }
+  .chat-panel {
+    min-height: 360px;
+  }
+  .messages {
+    height: 280px;
+  }
+  .chat-heading {
+    padding: 13px;
+  }
+  .chat-heading strong {
+    font-size: 11px;
+  }
+  .message-form {
+    padding: 10px;
+  }
+  .chat-fab {
+    width: 48px;
+    height: 48px;
+    bottom: 18px;
+    right: 18px;
+  }
+  .account-content .section-head .btn {
+    font-size: 10px;
+    padding: 9px;
+  }
+  .table-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .toast {
+    font-size: 11px;
+    bottom: 18px;
+    min-width: 80vw;
+  }
+  .auth-switch,
+  .auth-switch .text-button {
+    font-size: 10px;
+  }
+}
