@@ -25,10 +25,46 @@ import { EventEmitter } from "node:events";
 import { Database } from "./database.js";
 import { allow } from "./auth.js";
 import { id, text, page } from "./validation.js";
+import type { Message, SupportRequest } from "./models.js";
+import { queryRows } from "./query.js";
+type ChatMessage = Message & { authorName: string; createdAt: Date };
+function messageResponse(m: ChatMessage) {
+  return {
+    id: m.id,
+    createdAt: m.sentAt,
+    sentAt: m.sentAt,
+    text: m.text,
+    readAt: m.readAt,
+    author: { id: m.authorId, name: m.authorName },
+  };
+}
+function requestResponse(r: any, includeClient = false) {
+  return {
+    id: r.id,
+    createdAt: r.createdAt,
+    isActive: r.isActive,
+    hasNewMessages: r.hasNewMessages ?? false,
+    ...(includeClient ? { client: r.client } : {}),
+  };
+}
 @Injectable()
-export class SupportRequestService {
+export class SupportRequestService implements ISupportRequestService {
   readonly events = new EventEmitter();
   constructor(private db: Database) {}
+  async authorizeSocket(chatId: number, request: any) {
+    const session = await new Promise<any>((resolve, reject) =>
+      request.sessionStore.get(request.sessionID, (error: any, value: any) =>
+        error ? reject(error) : resolve(value),
+      ),
+    );
+    const userId = session?.passport?.user;
+    const user = userId
+      ? (
+          await this.db.query("SELECT id,role FROM users WHERE id=$1", [userId])
+        )[0]
+      : undefined;
+    return this.authorize(chatId, user);
+  }
   async authorize(chatId: number, user: any) {
     allow({ user }, "client", "manager");
     const chat = (
@@ -65,7 +101,7 @@ export class SupportRequestService {
       ],
     );
   }
-  async createSupportRequest(user: any, value: any) {
+  async createSupportRequest(user: any, value: any): Promise<SupportRequest> {
     const message = text(value, "Сообщение", 1, 5000);
     return this.db.transaction(async (em) => {
       const chat = (
@@ -81,14 +117,18 @@ export class SupportRequestService {
       return chat;
     });
   }
-  async getMessages(chatId: number, user?: any) {
+  async getMessages(chatId: number, user?: any): Promise<ChatMessage[]> {
     if (user !== undefined) await this.authorize(chatId, user);
     return this.db.query(
-      `SELECT m.id,m.text,m."sentAt",m."sentAt" AS "createdAt",m."readAt",json_build_object('id',u.id,'name',u.name) AS author FROM messages m JOIN users u ON u.id=m."authorId" WHERE m."supportRequest"=$1 ORDER BY m.id`,
+      `SELECT m.*,m."sentAt" AS "createdAt",u.name AS "authorName" FROM messages m JOIN users u ON u.id=m."authorId" WHERE m."supportRequest"=$1 ORDER BY m.id`,
       [chatId],
     );
   }
-  async sendMessage(chatId: any, user?: any, value?: any): Promise<any> {
+  async sendMessage(
+    chatId: any,
+    user?: any,
+    value?: any,
+  ): Promise<ChatMessage> {
     if (typeof chatId === "object") {
       const data = chatId;
       const author = (
@@ -114,19 +154,12 @@ export class SupportRequestService {
           [chatId, user.id, message],
         )
       )[0];
-      return {
-        id: m.id,
-        text: m.text,
-        sentAt: m.sentAt,
-        createdAt: m.sentAt,
-        readAt: m.readAt,
-        author: { id: user.id, name: user.name },
-      };
+      return { ...m, createdAt: m.sentAt, authorName: user.name };
     });
     this.events.emit("message", request, result);
     return result;
   }
-  subscribe(handler: (request: any, message: any) => void) {
+  subscribe(handler: (request: SupportRequest, message: Message) => void) {
     this.events.on("message", handler);
     return () => {
       this.events.off("message", handler);
@@ -134,11 +167,14 @@ export class SupportRequestService {
   }
   async markMessagesAsRead(chatId: number, user: any, before: any) {
     await this.authorize(chatId, user);
-    const date = new Date(String(before));
-    if (!Number.isFinite(+date) || date > new Date())
+    const date =
+      before instanceof Date
+        ? new Date(before.getTime())
+        : new Date(String(before));
+    if (!Number.isFinite(+date))
       throw new ConflictException("Некорректная дата");
     await this.db.query(
-      `UPDATE messages SET "readAt"=now() WHERE "supportRequest"=$1 AND "authorId" IN (SELECT id FROM users WHERE role=$2) AND "readAt" IS NULL AND "sentAt"<=$3`,
+      `UPDATE messages SET "readAt"=now() WHERE "supportRequest"=$1 AND "authorId" IN (SELECT id FROM users WHERE role=$2) AND "readAt" IS NULL AND date_trunc('milliseconds',"sentAt")<=$3`,
       [chatId, user.role === "client" ? "manager" : "client", date],
     );
     this.events.emit("read", chatId);
@@ -184,13 +220,15 @@ export interface GetChatListParams {
   isActive: boolean;
 }
 export interface ISupportRequestService {
-  findSupportRequests(params: GetChatListParams): Promise<any[]>;
-  sendMessage(data: SendMessageDto): Promise<any>;
-  getMessages(supportRequest: number): Promise<any[]>;
-  subscribe(handler: (request: any, message: any) => void): () => void;
+  findSupportRequests(params: GetChatListParams): Promise<SupportRequest[]>;
+  sendMessage(data: SendMessageDto): Promise<Message>;
+  getMessages(supportRequest: number): Promise<Message[]>;
+  subscribe(
+    handler: (request: SupportRequest, message: Message) => void,
+  ): () => void;
 }
 export interface ISupportRequestClientService {
-  createSupportRequest(data: CreateSupportRequestDto): Promise<any>;
+  createSupportRequest(data: CreateSupportRequestDto): Promise<SupportRequest>;
   markMessagesAsRead(params: MarkMessagesAsReadDto): Promise<any>;
   getUnreadCount(supportRequest: number): Promise<number>;
 }
@@ -264,9 +302,11 @@ export class SupportRequestEmployeeService implements ISupportRequestEmployeeSer
     );
   }
   async closeRequest(chatId: number) {
-    const rows = await this.db.query(
-      'UPDATE support_requests SET "isActive"=false WHERE id=$1 RETURNING id',
-      [id(chatId)],
+    const rows = queryRows(
+      await this.db.query(
+        'UPDATE support_requests SET "isActive"=false WHERE id=$1 RETURNING id',
+        [id(chatId)],
+      ),
     );
     if (!rows.length) throw new NotFoundException();
     this.support.events.emit("closed", chatId);
@@ -276,13 +316,36 @@ export class SupportRequestEmployeeService implements ISupportRequestEmployeeSer
 export class SupportGateway implements OnModuleInit {
   @WebSocketServer() server!: Server;
   constructor(private support: SupportRequestService) {}
+  private async emitAuthorized(chatId: number, event: string, payload: any) {
+    const members = Array.from(
+      this.server.sockets.adapter.rooms.get(`chat:${chatId}`) || [],
+    );
+    await Promise.all(
+      members.map(async (socketId) => {
+        const socket = this.server.sockets.sockets.get(socketId);
+        if (!socket) return;
+        try {
+          await this.support.authorizeSocket(chatId, socket.request);
+          socket.emit(event, payload);
+        } catch {
+          socket.disconnect(true);
+        }
+      }),
+    );
+  }
   onModuleInit() {
-    this.support.subscribe((request, m) =>
-      this.server.to(`chat:${request.id}`).emit("message", m),
+    this.support.subscribe(
+      (request, m) =>
+        void this.emitAuthorized(
+          request.id,
+          "message",
+          messageResponse(m as ChatMessage),
+        ),
     );
     for (const event of ["read", "closed"])
-      this.support.events.on(event, (chatId: number) =>
-        this.server.to(`chat:${chatId}`).emit(event, { chatId }),
+      this.support.events.on(
+        event,
+        (chatId: number) => void this.emitAuthorized(chatId, event, { chatId }),
       );
   }
   @SubscribeMessage("subscribeToChat") async subscribe(
@@ -290,8 +353,7 @@ export class SupportGateway implements OnModuleInit {
     @MessageBody() chatId: any,
   ) {
     try {
-      const user = (socket.request as any).user;
-      await this.support.authorize(id(chatId), user);
+      await this.support.authorizeSocket(id(chatId), socket.request);
       await socket.join(`chat:${id(chatId)}`);
       return { success: true };
     } catch {
@@ -303,29 +365,43 @@ export class SupportGateway implements OnModuleInit {
 @Controller("api")
 export class SupportController {
   constructor(private service: SupportRequestService) {}
-  @Post("client/support-requests") create(@Req() req: any, @Body() b: any) {
+  @Post("client/support-requests") async create(
+    @Req() req: any,
+    @Body() b: any,
+  ) {
     allow(req, "client");
-    return this.service.createSupportRequest(req.user, b.text);
+    return [
+      requestResponse(
+        await this.service.createSupportRequest(req.user, b.text),
+      ),
+    ];
   }
-  @Get(["client/support-requests", "manager/support-requests"]) list(
+  @Get(["client/support-requests", "manager/support-requests"]) async list(
     @Req() req: any,
     @Query() q: any,
   ) {
     allow(req, req.path.includes("/manager/") ? "manager" : "client");
-    return this.service.findSupportRequests(req.user, q);
+    return (await this.service.findSupportRequests(req.user, q)).map((r: any) =>
+      requestResponse(r, req.user.role === "manager"),
+    );
   }
-  @Get("common/support-requests/:id/messages") messages(
+  @Get("common/support-requests/:id/messages") async messages(
     @Req() req: any,
     @Param("id") v: string,
   ) {
-    return this.service.getMessages(id(v), req.user);
+    allow(req, "client", "manager");
+    return (await this.service.getMessages(id(v), req.user)).map(
+      messageResponse,
+    );
   }
-  @Post("common/support-requests/:id/messages") send(
+  @Post("common/support-requests/:id/messages") async send(
     @Req() req: any,
     @Param("id") v: string,
     @Body() b: any,
   ) {
-    return this.service.sendMessage(id(v), req.user, b.text);
+    return [
+      messageResponse(await this.service.sendMessage(id(v), req.user, b.text)),
+    ];
   }
   @Post("common/support-requests/:id/messages/read") read(
     @Req() req: any,

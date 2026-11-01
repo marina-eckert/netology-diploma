@@ -179,8 +179,14 @@ function Modal({
     </div>
   );
 }
-function Auth({ close }: { close: () => void }) {
-  const [register, setRegister] = useState(false),
+function Auth({
+  close,
+  initialRegister = false,
+}: {
+  close: () => void;
+  initialRegister?: boolean;
+}) {
+  const [register, setRegister] = useState(initialRegister),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const dispatch = useDispatch();
@@ -266,7 +272,7 @@ function Auth({ close }: { close: () => void }) {
   );
 }
 function App() {
-  const [auth, setAuth] = useState(false),
+  const [auth, setAuth] = useState<false | "login" | "register">(false),
     [notice, setNotice] = useState("");
   const dispatch = useDispatch(),
     user = useUser(),
@@ -287,7 +293,7 @@ function App() {
   }, [notice]);
   return (
     <AppContext.Provider
-      value={{ notify: setNotice, login: () => setAuth(true) }}
+      value={{ notify: setNotice, login: () => setAuth("login") }}
     >
       <header>
         <div className="container header-row">
@@ -324,10 +330,18 @@ function App() {
                 </button>
               </>
             ) : (
-              <button className="btn green" onClick={() => setAuth(true)}>
-                <Icon type="user" size={18} />
-                Войти
-              </button>
+              <>
+                <button
+                  className="text-button"
+                  onClick={() => setAuth("register")}
+                >
+                  Регистрация
+                </button>
+                <button className="btn green" onClick={() => setAuth("login")}>
+                  <Icon type="user" size={18} />
+                  Войти
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -382,7 +396,12 @@ function App() {
           <Icon type="chat" />
         </Link>
       )}
-      {auth && <Auth close={() => setAuth(false)} />}
+      {auth && (
+        <Auth
+          initialRegister={auth === "register"}
+          close={() => setAuth(false)}
+        />
+      )}
       {notice && (
         <div className="toast" role="status">
           {notice}
@@ -1313,7 +1332,7 @@ function Support() {
           send("POST", { text: draft }),
         );
         await loadChats();
-        setSelected(c.id);
+        setSelected(c[0].id);
         setNewChat(false);
       } else {
         await api(

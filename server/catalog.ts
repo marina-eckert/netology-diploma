@@ -21,8 +21,9 @@ import { diskStorage } from "multer";
 import { randomUUID } from "node:crypto";
 import { Database } from "./database.js";
 import { allow, UsersModule, UsersService } from "./auth.js";
-import { text, id, count, page, dates } from "./validation.js";
+import { text, id, count, page, dates, publicUser } from "./validation.js";
 import { peakReservations } from "./availability.js";
+import { queryRows } from "./query.js";
 @Injectable()
 export class CatalogService {
   constructor(private db: Database) {}
@@ -32,7 +33,7 @@ export class CatalogService {
       end = new Date(Date.now() + 1);
     if (q.dateStart || q.dateEnd) [start, end] = dates(q.dateStart, q.dateEnd);
     return this.db.query(
-      `WITH found AS (SELECT b.*,l.name AS "libraryName",l.address,free_copies(b.id,$7,$8) AS "availableInPeriod" FROM books b JOIN libraries l ON l.id=b."libraryId" WHERE b.title ILIKE $1 AND b.author ILIKE $2 AND ($3::int IS NULL OR b."libraryId"=$3)) SELECT * FROM found WHERE ($4::boolean=false OR ("isAvailable" AND "availableInPeriod">0)) ORDER BY id LIMIT $5 OFFSET $6`,
+      `WITH found AS (SELECT b.*,l.name AS "libraryName",l.address,free_copies(b.id,$7,$8) AS "availableInPeriod" FROM books b JOIN libraries l ON l.id=b."libraryId" WHERE b.title ILIKE $1 AND b.author ILIKE $2 AND ($3::int IS NULL OR b."libraryId"=$3)) SELECT found.*,free_copies(id,now(),now()+interval '1 microsecond') AS "availableCopies" FROM found WHERE ($4::boolean=false OR ("isAvailable" AND "availableInPeriod">0)) ORDER BY id LIMIT $5 OFFSET $6`,
       [
         `%${q.title || ""}%`,
         `%${q.author || ""}%`,
@@ -48,7 +49,7 @@ export class CatalogService {
   async book(bookId: number) {
     const b = (
       await this.db.query(
-        'SELECT b.*,l.name AS "libraryName",l.address FROM books b JOIN libraries l ON l.id=b."libraryId" WHERE b.id=$1',
+        'SELECT b.*,l.name AS "libraryName",l.address,free_copies(b.id,now(),now()+interval \'1 microsecond\') AS "availableCopies" FROM books b JOIN libraries l ON l.id=b."libraryId" WHERE b.id=$1',
         [bookId],
       )
     )[0];
@@ -64,15 +65,17 @@ export class CatalogService {
       text(data.address, "Адрес", 2, 500),
       text(data.description || "", "Описание", 0, 5000),
     ];
-    const rows = libId
-      ? await this.db.query(
-          'UPDATE libraries SET name=$1,address=$2,description=$3,"updatedAt"=now() WHERE id=$4 RETURNING *',
-          [...values, libId],
-        )
-      : await this.db.query(
-          "INSERT INTO libraries(name,address,description) VALUES($1,$2,$3) RETURNING *",
-          values,
-        );
+    const rows = queryRows(
+      libId
+        ? await this.db.query(
+            'UPDATE libraries SET name=$1,address=$2,description=$3,"updatedAt"=now() WHERE id=$4 RETURNING *',
+            [...values, libId],
+          )
+        : await this.db.query(
+            "INSERT INTO libraries(name,address,description) VALUES($1,$2,$3) RETURNING *",
+            values,
+          ),
+    );
     if (!rows[0]) throw new NotFoundException();
     return rows[0];
   }
@@ -140,7 +143,7 @@ export class CatalogService {
           ? (previous?.isAvailable ?? true)
           : String(data.isAvailable) === "true",
       ];
-      return (
+      return queryRows(
         bookId
           ? await em.query(
               'UPDATE books SET "libraryId"=$1,title=$2,author=$3,year=$4,description=$5,"coverImage"=$6,"totalCopies"=$7,"availableCopies"=$8,"isAvailable"=$9,"updatedAt"=now() WHERE id=$10 RETURNING *',
@@ -149,15 +152,16 @@ export class CatalogService {
           : await em.query(
               'INSERT INTO books("libraryId",title,author,year,description,"coverImage","totalCopies","availableCopies","isAvailable") VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
               values,
-            )
+            ),
       )[0];
     });
   }
   async remove(kind: "books" | "libraries", recordId: number) {
     try {
-      const rows = await this.db.query(
-        `DELETE FROM ${kind} WHERE id=$1 RETURNING id`,
-        [recordId],
+      const rows = queryRows(
+        await this.db.query(`DELETE FROM ${kind} WHERE id=$1 RETURNING id`, [
+          recordId,
+        ]),
       );
       if (!rows.length) throw new NotFoundException();
       return { success: true };
@@ -264,13 +268,13 @@ export class AdminController {
     allow(req, "admin");
     return this.service.remove("books", id(v));
   }
-  @Get("users") list(@Req() req: any, @Query() q: any) {
+  @Get("users") async list(@Req() req: any, @Query() q: any) {
     allow(req, "admin");
-    return this.users.findAll(q);
+    return (await this.users.findAll(q)).map(publicUser);
   }
-  @Post("users") user(@Req() req: any, @Body() b: any) {
+  @Post("users") async user(@Req() req: any, @Body() b: any) {
     allow(req, "admin");
-    return this.users.create(b);
+    return publicUser(await this.users.createAccount(b));
   }
   @Patch("users/:id") editUser(
     @Req() req: any,
@@ -288,9 +292,9 @@ export class AdminController {
 @Controller("api/manager/users")
 export class ManagerUsersController {
   constructor(private users: UsersService) {}
-  @Get() list(@Req() req: any, @Query() q: any) {
+  @Get() async list(@Req() req: any, @Query() q: any) {
     allow(req, "manager");
-    return this.users.findAll(q);
+    return (await this.users.findAll(q)).map(publicUser);
   }
 }
 @Module({

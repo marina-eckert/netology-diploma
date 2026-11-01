@@ -17,6 +17,7 @@ import { Database } from "./database.js";
 import { allow } from "./auth.js";
 import { dates, id, page } from "./validation.js";
 import { peakReservations } from "./availability.js";
+import { queryRows } from "./query.js";
 @Injectable()
 export class RentalsService {
   constructor(private db: Database) {}
@@ -94,11 +95,11 @@ export class RentalsService {
       };
       if (!transitions[r.status].includes(next))
         throw new ConflictException("Недопустимое изменение статуса");
-      const result = (
+      const result = queryRows(
         await em.query(
           'UPDATE rentals SET status=$1,"updatedAt"=now() WHERE id=$2 RETURNING *',
           [next, rentalId],
-        )
+        ),
       )[0];
       await this.refresh(em, r.bookId);
       return result;

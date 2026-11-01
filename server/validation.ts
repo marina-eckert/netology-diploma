@@ -17,9 +17,20 @@ export function text(
 }
 export function id(value: unknown): number {
   const n = Number(value);
-  if (!Number.isInteger(n) || n < 1)
+  if (!Number.isSafeInteger(n) || n < 1 || n > 2147483647)
     throw new BadRequestException("Некорректный ID");
   return n;
+}
+export function password(value: unknown, min = 8): string {
+  if (
+    typeof value !== "string" ||
+    value.length < min ||
+    Buffer.byteLength(value, "utf8") > 72
+  )
+    throw new BadRequestException(
+      `Пароль: минимум ${min} символов и не более 72 байт UTF-8`,
+    );
+  return value;
 }
 export function count(value: unknown, fallback = 1, max = 10000): number {
   const n = value === undefined ? fallback : Number(value);

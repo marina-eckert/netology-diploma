@@ -54,10 +54,11 @@ async function bootstrap() {
   let disconnectSession = (_sessionId: string) => {};
   const loginAttempts = new Map<string, { count: number; until: number }>();
   app.use((req: any, res: any, next: any) => {
+    const routePath = req.path.replace(/\/+$/, "");
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "same-origin");
     res.setHeader("X-Frame-Options", "DENY");
-    if (req.path === "/api/auth/logout" && req.method === "POST") {
+    if (routePath === "/api/auth/logout" && req.method === "POST") {
       const sessionId = req.sessionID;
       res.once("finish", () => {
         if (res.statusCode < 400) disconnectSession(sessionId);
@@ -80,7 +81,7 @@ async function bootstrap() {
       return res
         .status(req.user ? 403 : 401)
         .json({ message: "Требуются права администратора" });
-    if (req.path === "/api/auth/login" && req.method === "POST") {
+    if (routePath === "/api/auth/login" && req.method === "POST") {
       const key = req.ip;
       const now = Date.now();
       let item = loginAttempts.get(key);

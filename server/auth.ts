@@ -15,53 +15,74 @@ import {
   ConflictException,
   BadRequestException,
   UseGuards,
+  HttpCode,
+  NotFoundException,
 } from "@nestjs/common";
 import passport from "passport";
 import { Strategy } from "passport-local";
 import { compare, hash } from "bcryptjs";
 import { Database } from "./database.js";
-import { text, publicUser, page } from "./validation.js";
+import { text, publicUser, page, password } from "./validation.js";
+import type { User, SearchUserParams, IUserService } from "./models.js";
+import { queryRows } from "./query.js";
 @Injectable()
-export class UsersService {
+export class UsersService implements IUserService {
   constructor(private db: Database) {}
-  async findById(id: number) {
-    return (await this.db.query("SELECT * FROM users WHERE id=$1", [id]))[0];
+  async findById(id: number): Promise<User> {
+    const user = (
+      await this.db.query("SELECT * FROM users WHERE id=$1", [id])
+    )[0];
+    if (!user) throw new NotFoundException("Пользователь не найден");
+    return user;
   }
-  async findByEmail(email: string) {
-    return (
+  async findByEmail(email: string): Promise<User> {
+    const user = (
       await this.db.query("SELECT * FROM users WHERE email=$1", [
         email.toLowerCase(),
       ])
     )[0];
+    if (!user) throw new NotFoundException("Пользователь не найден");
+    return user;
   }
-  async create(data: any) {
+  async createAccount(data: any): Promise<User> {
+    return this.create({
+      email: data.email,
+      name: data.name,
+      contactPhone: data.contactPhone,
+      role: data.role,
+      passwordHash: await hash(password(data.password), 12),
+    });
+  }
+  async create(data: Partial<User>): Promise<User> {
     const email = text(data.email, "Email").toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
       throw new ConflictException("Некорректный email");
     const name = text(data.name, "Имя", 2, 100),
-      password = text(data.password, "Пароль", 8, 128),
       phone = text(data.contactPhone || "", "Телефон", 0, 40);
+    if (
+      !data.passwordHash ||
+      !/^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(data.passwordHash)
+    )
+      throw new BadRequestException("Требуется bcrypt-хеш пароля");
     const role = data.role || "client";
     if (!["client", "admin", "manager"].includes(role))
       throw new ConflictException("Некорректная роль");
     try {
-      return publicUser(
-        (
-          await this.db.query(
-            'INSERT INTO users(email,name,"passwordHash","contactPhone",role) VALUES($1,$2,$3,$4,$5) RETURNING *',
-            [email, name, await hash(password, 12), phone, role],
-          )
-        )[0],
-      );
+      return (
+        await this.db.query(
+          'INSERT INTO users(email,name,"passwordHash","contactPhone",role) VALUES($1,$2,$3,$4,$5) RETURNING *',
+          [email, name, data.passwordHash, phone, role],
+        )
+      )[0];
     } catch (e: any) {
       if (e.code === "23505") throw new BadRequestException("Email уже занят");
       throw e;
     }
   }
-  async findAll(q: any) {
+  async findAll(q: Partial<SearchUserParams>): Promise<User[]> {
     const [limit, offset] = page(q);
     return await this.db.query(
-      'SELECT id,email,name,"contactPhone",role FROM users WHERE email ILIKE $1 AND name ILIKE $2 AND "contactPhone" ILIKE $3 ORDER BY id LIMIT $4 OFFSET $5',
+      'SELECT * FROM users WHERE email ILIKE $1 AND name ILIKE $2 AND "contactPhone" ILIKE $3 ORDER BY id LIMIT $4 OFFSET $5',
       [
         `%${q.email || ""}%`,
         `%${q.name || ""}%`,
@@ -85,16 +106,16 @@ export class UsersService {
       throw new ConflictException("Некорректные данные");
     if (actor.id === userId && role !== old.role)
       throw new ConflictException("Нельзя изменить собственную роль");
-    const password = data.password
-      ? await hash(text(data.password, "Пароль", 8, 128), 12)
+    const passwordHash = data.password
+      ? await hash(password(data.password), 12)
       : old.passwordHash;
     try {
       return publicUser(
-        (
+        queryRows(
           await this.db.query(
             'UPDATE users SET email=$1,name=$2,"contactPhone"=$3,role=$4,"passwordHash"=$5 WHERE id=$6 RETURNING *',
-            [email, name, phone, role, password, userId],
-          )
+            [email, name, phone, role, passwordHash, userId],
+          ),
         )[0],
       );
     } catch (e: any) {
@@ -106,11 +127,12 @@ export class UsersService {
     if (userId === actor.id)
       throw new ConflictException("Нельзя удалить собственный аккаунт");
     try {
-      const rows = await this.db.query(
-        "DELETE FROM users WHERE id=$1 RETURNING id",
-        [userId],
+      const rows = queryRows(
+        await this.db.query("DELETE FROM users WHERE id=$1 RETURNING id", [
+          userId,
+        ]),
       );
-      if (!rows.length) throw new ConflictException("Пользователь не найден");
+      if (!rows.length) throw new NotFoundException("Пользователь не найден");
       return { success: true };
     } catch (e: any) {
       if (e.code === "23503")
@@ -153,9 +175,13 @@ export class AuthController {
       req.user,
     );
   }
-  @Post("login") login(@Req() req: any, @Res() res: any, @Body() body: any) {
+  @Post("login") @HttpCode(200) login(
+    @Req() req: any,
+    @Res() res: any,
+    @Body() body: any,
+  ) {
     text(body.email, "Email");
-    text(body.password, "Пароль");
+    password(body.password, 1);
     if (req.user) throw new ConflictException("Вы уже вошли");
     passport.authenticate("local", (err: any, user: any) => {
       if (err) return res.status(500).json({ message: "Не удалось войти" });
@@ -175,7 +201,7 @@ export class AuthController {
     req.logout(() =>
       req.session.destroy(() => {
         res.clearCookie("library.sid");
-        res.json({ success: true });
+        res.status(200).end();
       }),
     );
   }
@@ -183,9 +209,11 @@ export class AuthController {
 @Controller("api/client")
 export class RegisterController {
   constructor(private users: UsersService) {}
-  @Post("register") register(@Body() body: any, @Req() req: any) {
+  @Post("register") async register(@Body() body: any, @Req() req: any) {
     if (req.user) throw new ConflictException("Вы уже вошли");
-    return this.users.create({ ...body, role: "client" });
+    return publicUser(
+      await this.users.createAccount({ ...body, role: "client" }),
+    );
   }
 }
 @Module({
@@ -202,7 +230,8 @@ export function configurePassport(users: UsersService) {
         const u = await users.findByEmail(email);
         done(null, u && (await compare(password, u.passwordHash)) ? u : false);
       } catch (e) {
-        done(e);
+        if (e instanceof NotFoundException) done(null, false);
+        else done(e);
       }
     }),
   );
@@ -211,7 +240,8 @@ export function configurePassport(users: UsersService) {
     try {
       done(null, (await users.findById(id)) || false);
     } catch (e) {
-      done(e);
+      if (e instanceof NotFoundException) done(null, false);
+      else done(e);
     }
   });
 }

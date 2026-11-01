@@ -28,6 +28,12 @@ CREATE TABLE IF NOT EXISTS messages (
  "authorId" INTEGER NOT NULL REFERENCES users(id), "sentAt" TIMESTAMPTZ NOT NULL DEFAULT now(), text TEXT NOT NULL, "readAt" TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS messages_chat ON messages("supportRequest",id);
+-- Compatibility names from the task's domain models; existing numeric IDs remain stable.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS _id INTEGER GENERATED ALWAYS AS (id) STORED NOT NULL UNIQUE;
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS _id INTEGER GENERATED ALWAYS AS (id) STORED NOT NULL UNIQUE;
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS "user" INTEGER GENERATED ALWAYS AS ("userId") STORED NOT NULL;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS _id INTEGER GENERATED ALWAYS AS (id) STORED NOT NULL UNIQUE;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS author INTEGER GENERATED ALWAYS AS ("authorId") STORED NOT NULL;
 -- Group coincident endpoints before summing: return and pickup may share a date.
 CREATE OR REPLACE FUNCTION free_copies(p_book INTEGER,p_start TIMESTAMPTZ,p_end TIMESTAMPTZ)
 RETURNS INTEGER LANGUAGE SQL STABLE AS $$
